@@ -4,11 +4,11 @@ import { MobileNav } from "@/components/mobile-nav";
 import { IIRanLogo } from "@/components/iiran-logo";
 
 const navLinks = [
-  { href: "#stories", label: "Stories" },
-  { href: "#dashboard", label: "Crisis Data" },
-  { href: "#news", label: "News" },
-  { href: "#help", label: "How to Help" },
-  { href: "#impact", label: "Impact" },
+  { href: "/#stories", label: "Stories" },
+  { href: "/#dashboard", label: "Crisis Data" },
+  { href: "/#news", label: "News" },
+  { href: "/#help", label: "How to Help" },
+  { href: "/#impact", label: "Impact" },
   { href: "/about", label: "About" },
   { href: "/transparency", label: "Transparency" },
 ];

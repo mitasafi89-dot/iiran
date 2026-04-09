@@ -33,10 +33,10 @@ export function Footer() {
           <div>
             <h3 className="font-semibold text-sm mb-3">Quick Links</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="#stories" className="hover:text-foreground transition-colors">Stories</Link></li>
-              <li><Link href="#dashboard" className="hover:text-foreground transition-colors">Crisis Dashboard</Link></li>
+              <li><Link href="/#stories" className="hover:text-foreground transition-colors">Stories</Link></li>
+              <li><Link href="/#dashboard" className="hover:text-foreground transition-colors">Crisis Dashboard</Link></li>
               <li><Link href="/donate" className="hover:text-foreground transition-colors">Donate</Link></li>
-              <li><Link href="#impact" className="hover:text-foreground transition-colors">Impact Reports</Link></li>
+              <li><Link href="/#impact" className="hover:text-foreground transition-colors">Impact Reports</Link></li>
               <li><Link href="/news" className="hover:text-foreground transition-colors">News</Link></li>
             </ul>
           </div>
