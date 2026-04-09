@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { HumanStories } from "@/components/human-stories";
 import { Pagination } from "@/components/pagination";
 import { getStories } from "@/lib/data";
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 const PER_PAGE = 20;
 
-export default async function StoriesPage({
+async function StoriesContent({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -36,5 +37,17 @@ export default async function StoriesPage({
         />
       </div>
     </div>
+  );
+}
+
+export default function StoriesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  return (
+    <Suspense fallback={<div className="pt-16 min-h-screen" />}>
+      <StoriesContent searchParams={searchParams} />
+    </Suspense>
   );
 }

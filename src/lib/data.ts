@@ -867,7 +867,10 @@ export async function getDashboardData(): Promise<DashboardResult> {
   "use cache";
   cacheLife("newsPipeline");
 
-  const rwData = await fetchReliefWebCounts();
+  const rwData = await withTimeout(
+    fetchReliefWebCounts(),
+    { activeDisasters: 0, recentReports: 0, live: false },
+  );
 
   return {
     displaced: 1_850_000,
@@ -965,6 +968,10 @@ export async function getVideos(): Promise<VideoData[]> {
   "use cache";
   cacheLife("newsPipeline");
 
+  return withTimeout(fetchVideosPipeline(), getVideosFallback());
+}
+
+async function fetchVideosPipeline(): Promise<VideoData[]> {
   try {
     const channels = APIs.youtubeChannels;
     const feedPromises = Object.entries(channels).map(([name, channelId]) =>

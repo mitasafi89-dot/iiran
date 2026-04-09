@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { NewsFeed } from "@/components/news-feed";
 import { Pagination } from "@/components/pagination";
 import { getNewsFeed } from "@/lib/data";
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 const PER_PAGE = 20;
 
-export default async function NewsPage({
+async function NewsContent({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -36,5 +37,17 @@ export default async function NewsPage({
         />
       </div>
     </div>
+  );
+}
+
+export default function NewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  return (
+    <Suspense fallback={<div className="pt-16 min-h-screen" />}>
+      <NewsContent searchParams={searchParams} />
+    </Suspense>
   );
 }

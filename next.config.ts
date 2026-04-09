@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    useCache: true,
-  },
+  cacheComponents: true,
 
   // ── Hardening: disable unnecessary features ─────────────────────────
   // Disable server-side source maps in production (prevents stack trace leakage)
