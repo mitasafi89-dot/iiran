@@ -1,0 +1,15 @@
+# IIRan Security Policy
+# https://securitytxt.org/ | RFC 9116
+
+Contact: mailto:info@iiran.org
+Contact: https://iiran.org/ethics
+Expires: 2026-12-31T23:59:00.000Z
+Preferred-Languages: en, fa
+Canonical: https://iiran.org/.well-known/security.txt
+Policy: https://iiran.org/privacy
+Acknowledgments: https://iiran.org/transparency
+
+# We take security seriously. If you discover a vulnerability,
+# please report it responsibly to info@iiran.org.
+# We commit to acknowledging reports within 48 hours
+# and providing a substantive response within 5 business days.
