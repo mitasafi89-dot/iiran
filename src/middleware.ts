@@ -159,11 +159,14 @@ export async function middleware(request: NextRequest) {
   // response header. For now it remains for hydration compatibility.
 
   // ── Content Security Policy ────────────────────────────────────────
-  // Strict CSP with nonce for inline scripts (Next.js hydration)
+  // NOTE: Nonce-based CSP is incompatible with Vercel's prerendered/cached
+  // pages because the HTML is generated at build time without middleware nonces.
+  // Using 'self' for script-src instead. Inline scripts are handled by
+  // 'strict-dynamic' which trusts scripts loaded by already-trusted scripts.
   const csp = [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
-    `style-src 'self' 'unsafe-inline'`, // Next.js injects styles; nonce for styles is not yet universally supported
+    `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+    `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https://images.unsplash.com https://upload.wikimedia.org https://i.ytimg.com https://i.guim.co.uk https://media.guim.co.uk https://reliefweb.int https://images.pexels.com https://pixabay.com https://media.mehrnews.com https://*.presstv.ir https://cdn.presstv.ir https://static.presstv.ir https://cdn-media.tass.ru https://cdnph.upi.com https://*.tehrantimes.com https://*.aljazeera.com https://*.aljazeera.net https://*.middleeasteye.net https://*.tass.com https://*.tass.ru https://*.supabase.co`,
     `font-src 'self' https://fonts.gstatic.com`,
     `connect-src 'self' https://*.supabase.co`,
