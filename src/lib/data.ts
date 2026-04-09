@@ -17,6 +17,18 @@ import { getStoriesFromDB, getNewsFromDB } from "@/lib/supabase-data";
 import { validateWithAI } from "@/lib/pipeline/ai-validation";
 import { cacheSourceResult, getStaleArticles, getResilienceAction, detectIranBlackout } from "@/lib/pipeline/resilience";
 
+// ── Pipeline timeout ────────────────────────────────────────────────────
+// Vercel serverless functions have strict timeouts (10s free, 60s pro).
+// Race the heavy pipeline against a timer so we always return data.
+const PIPELINE_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, fallback: T, ms = PIPELINE_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 // ── News Feed ───────────────────────────────────────────────────────────
 // Replaces: /api/news
 // Cached for 6 hours. Pipeline runs at most 4×/day.
@@ -45,6 +57,11 @@ export async function getNewsFeed(): Promise<PublishedArticle[]> {
     // DB unavailable, proceed with live fetch
   }
 
+  // Race the heavy RSS pipeline against a timeout so Vercel doesn't kill the function
+  return withTimeout(fetchNewsPipeline(), getNewsFallback());
+}
+
+async function fetchNewsPipeline(): Promise<PublishedArticle[]> {
   const run = createRun("news");
 
   try {
@@ -226,6 +243,11 @@ export async function getStories(): Promise<StoryData[]> {
     // DB unavailable, proceed with live fetch
   }
 
+  // Race the stories pipeline against a timeout so Vercel doesn't kill the function
+  return withTimeout(fetchStoriesPipeline(), getStoriesFallback());
+}
+
+async function fetchStoriesPipeline(): Promise<StoryData[]> {
   const run = createRun("stories");
 
   try {
