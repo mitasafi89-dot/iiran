@@ -33,8 +33,7 @@ export default function TermsPage() {
               By accessing or using the IIRan website (iiran.org), you agree to
               be bound by these Terms of Service. If you do not agree to these
               terms, please do not use our website or services. IIRan is operated
-              by IIRan, Inc., a registered nonprofit organization
-              (EIN: 88-4021573).
+              by IIRan, Inc., a registered nonprofit organization.
             </p>
           </section>
 

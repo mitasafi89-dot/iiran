@@ -91,7 +91,6 @@ const jsonLd = {
       description:
         "Independent nonprofit providing humanitarian aid to Iran. Help Iran through verified food, medical, and shelter relief for civilians affected by war, sanctions, and crisis.",
       foundingDate: "2023",
-      taxID: "88-4021573",
       nonprofitStatus: "501(c)(3)",
       areaServed: {
         "@type": "Country",

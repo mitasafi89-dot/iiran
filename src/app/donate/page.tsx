@@ -90,7 +90,7 @@ const faqs: { q: string; a: string }[] = [
   },
   {
     q: "How do I know my donation will be used properly?",
-    a: "IIRan is a registered 501(c)(3) nonprofit (EIN: 88-4021573). All donations are tracked on-chain and allocated to verified humanitarian programs. We publish transparency reports detailing fund allocation. You can follow the wallet address on any block explorer to see all transactions.",
+    a: "IIRan is a registered 501(c)(3) nonprofit. All donations are tracked on-chain and allocated to verified humanitarian programs. We publish transparency reports detailing fund allocation. You can follow the wallet address on any block explorer to see all transactions.",
   },
   {
     q: "What if I send the wrong token or use the wrong network?",
@@ -300,7 +300,7 @@ export default function DonatePage() {
               <div className="rounded-xl border border-border bg-card p-4 text-center">
                 <p className="text-xs text-muted-foreground">
                   <strong className="text-foreground">IIRan, Inc.</strong>{" "}
-                  - 501(c)(3) &middot; EIN 88-4021573
+                  - Registered 501(c)(3) Nonprofit
                 </p>
                 <div className="flex items-center justify-center gap-3 mt-2">
                   <Link href="/transparency" className="text-[11px] text-primary hover:underline">

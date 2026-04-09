@@ -33,7 +33,7 @@ const faqs = [
   },
   {
     q: "Is IIRan a legitimate charity for Iran relief?",
-    a: "Yes. IIRan, Inc. is a registered 501(c)(3) nonprofit (EIN: 88-4021573). We are non-partisan and do not support, endorse, or oppose any political entity. Our sole focus is the well-being of Iranian civilians affected by crisis. All financial records are publicly available.",
+    a: "Yes. IIRan, Inc. is a registered 501(c)(3) nonprofit. We are non-partisan and do not support, endorse, or oppose any political entity. Our sole focus is the well-being of Iranian civilians affected by crisis. All financial records are publicly available.",
   },
   {
     q: "What is the Woman, Life, Freedom movement in Iran?",

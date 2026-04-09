@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage() {
               iiran.org, make a donation, or interact with our services.
             </p>
             <p>
-              We are a registered nonprofit organization (EIN: 88-4021573). We
+              We are a registered nonprofit organization. We
               comply with applicable data protection laws, including the General
               Data Protection Regulation (GDPR) and other applicable
               international privacy regulations.

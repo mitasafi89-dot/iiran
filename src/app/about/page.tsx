@@ -140,8 +140,7 @@ export default function AboutPage() {
               million people across 31 provinces.
             </p>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              We are a registered 501(c)(3) nonprofit organization (EIN:
-              88-4021573) with global operations.
+              We are a registered 501(c)(3) nonprofit organization with global operations.
             </p>
           </div>
         </div>
@@ -159,7 +158,7 @@ export default function AboutPage() {
                 501(c)(3) Tax-Exempt
               </div>
               <div className="text-xs text-muted-foreground">
-                EIN: 88-4021573
+                Registered Nonprofit
               </div>
             </div>
             <div className="p-4">

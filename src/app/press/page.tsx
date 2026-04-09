@@ -133,7 +133,7 @@ export default function PressPage() {
 
               <li>
                 <strong className="text-foreground">Status:</strong> 501(c)(3)
-                nonprofit (EIN: 88-4021573)
+                registered nonprofit
               </li>
               <li>
                 <strong className="text-foreground">Executive Director:</strong>{" "}
