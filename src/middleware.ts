@@ -58,68 +58,88 @@ export async function middleware(request: NextRequest) {
   const ip = getIp(request);
 
   // ══════════════════════════════════════════════════════════════════════
-  // PHASE 1: DECEPTION LAYER — Intercept before normal routing
+  // PHASE 1: DECEPTION LAYER — Only for non-asset, non-page requests
+  // Skip deception for static assets, Next.js internals, and normal pages.
+  // The deception system accumulates threat scores that can block legit users
+  // when Vercel edge instances or prefetch requests lack standard headers.
   // ══════════════════════════════════════════════════════════════════════
 
-  // ── Record navigation for flow analysis ────────────────────────────
-  recordNavigation(ip, pathname);
+  const isStaticOrInternal =
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/favicon") ||
+    pathname.endsWith(".ico") ||
+    pathname.endsWith(".png") ||
+    pathname.endsWith(".jpg") ||
+    pathname.endsWith(".svg") ||
+    pathname.endsWith(".css") ||
+    pathname.endsWith(".js");
 
-  // ── Behavioral fingerprinting ──────────────────────────────────────
-  const fingerprint = generateBehavioralFingerprint(request.headers);
+  // Only run the deception layer on honeypot-eligible paths and API routes
+  const isDeceptionTarget =
+    !isStaticOrInternal && (
+      isTripwire(pathname) ||
+      pathname.startsWith("/api/v1/") ||
+      pathname.startsWith("/api/graphql") ||
+      pathname.startsWith("/api/internal/") ||
+      pathname.startsWith("/admin/") ||
+      pathname.startsWith("/.env") ||
+      pathname.startsWith("/.git")
+    );
 
-  // ── Automation detection ───────────────────────────────────────────
-  const automation = detectAutomation(request.headers);
-  if (automation.isLikely) {
-    recordSignal({
-      type: "automation_detected",
-      severity: "medium",
-      ip,
-      timestamp: Date.now(),
-      details: { signals: automation.signals, fingerprint },
-    });
-  }
+  if (isDeceptionTarget) {
+    // ── Record navigation for flow analysis ────────────────────────────
+    recordNavigation(ip, pathname);
 
-  // ── Suspicious navigation patterns ─────────────────────────────────
-  if (detectSuspiciousNavigation(ip)) {
-    recordSignal({
-      type: "suspicious_navigation",
-      severity: "medium",
-      ip,
-      timestamp: Date.now(),
-      details: { pathname, fingerprint },
-    });
-  }
+    // ── Behavioral fingerprinting ──────────────────────────────────────
+    const fingerprint = generateBehavioralFingerprint(request.headers);
 
-  // ── Evaluate auto-defense based on accumulated threat score ────────
-  evaluateAutoDefense(ip);
+    // ── Automation detection ───────────────────────────────────────────
+    const automation = detectAutomation(request.headers);
+    if (automation.isLikely) {
+      recordSignal({
+        type: "automation_detected",
+        severity: "medium",
+        ip,
+        timestamp: Date.now(),
+        details: { signals: automation.signals, fingerprint },
+      });
+    }
 
-  // ── Tripwire detection — honeypot paths (ALWAYS served) ────────────
-  // Serve decoy content regardless of block status. Honeypots are more
-  // valuable than blocking — they waste attacker time and gather intel.
-  if (isTripwire(pathname)) {
-    triggerTripwire(pathname, ip, request.headers);
+    // ── Suspicious navigation patterns ─────────────────────────────────
+    if (detectSuspiciousNavigation(ip)) {
+      recordSignal({
+        type: "suspicious_navigation",
+        severity: "medium",
+        ip,
+        timestamp: Date.now(),
+        details: { pathname, fingerprint },
+      });
+    }
+
+    // ── Evaluate auto-defense based on accumulated threat score ────────
     evaluateAutoDefense(ip);
 
-    // Serve convincing decoy content based on what they're probing
-    return await serveTripwireResponse(pathname, ip);
-  }
+    // ── Tripwire detection — honeypot paths (ALWAYS served) ────────────
+    if (isTripwire(pathname)) {
+      triggerTripwire(pathname, ip, request.headers);
+      evaluateAutoDefense(ip);
+      return await serveTripwireResponse(pathname, ip);
+    }
 
-  // ── Hard block for confirmed hostile actors ────────────────────────
-  // Only blocks non-tripwire routes. Attackers still see honeypots.
-  if (isBlocked(ip)) {
-    // Don't return 403 (tells them they're blocked).
-    // Return a tarpit: slow, misleading response.
-    await sleep(2000 + Math.random() * 3000);
-    return new NextResponse("Service Unavailable", {
-      status: 503,
-      headers: { "retry-after": String(30 + Math.floor(Math.random() * 60)) },
-    });
-  }
+    // ── Hard block for confirmed hostile actors ────────────────────────
+    if (isBlocked(ip)) {
+      await sleep(2000 + Math.random() * 3000);
+      return new NextResponse("Service Unavailable", {
+        status: 503,
+        headers: { "retry-after": String(30 + Math.floor(Math.random() * 60)) },
+      });
+    }
 
-  // ── Tarpit: add progressive delays for suspicious actors ───────────
-  const delay = computeDelay(ip);
-  if (delay > 0) {
-    await sleep(delay);
+    // ── Tarpit: add progressive delays for suspicious actors ───────────
+    const delay = computeDelay(ip);
+    if (delay > 0) {
+      await sleep(delay);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════
