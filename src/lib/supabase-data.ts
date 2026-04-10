@@ -13,13 +13,13 @@ export async function getStoriesFromDB(): Promise<StoryData[] | null> {
   const { data, error } = await supabase
     .from("stories")
     .select("*")
-    .not("image_url", "is", null)
     .order("published_at", { ascending: false })
     .limit(40);
 
   if (error || !data || data.length === 0) return null;
 
-  return data.map((row) => ({
+  // Sort: stories with images first, then by date
+  const mapped = data.map((row) => ({
     id: row.id,
     title: row.title,
     source: row.source,
@@ -32,19 +32,20 @@ export async function getStoriesFromDB(): Promise<StoryData[] | null> {
       : row.image_url,
     theme: row.theme,
   }));
+  return mapped.sort((a, b) => (a.imageUrl ? 0 : 1) - (b.imageUrl ? 0 : 1));
 }
 
 export async function getNewsFromDB(): Promise<PublishedArticle[] | null> {
   const { data, error } = await supabase
     .from("news_articles")
     .select("*")
-    .not("image_url", "is", null)
     .order("published_at", { ascending: false })
     .limit(40);
 
   if (error || !data || data.length === 0) return null;
 
-  return data.map((row) => ({
+  // Sort: articles with images first, then by date
+  const mapped = data.map((row) => ({
     title: row.title,
     source: row.source,
     url: row.url,
@@ -54,6 +55,7 @@ export async function getNewsFromDB(): Promise<PublishedArticle[] | null> {
       ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/images/${row.image_stored_path}`
       : row.image_url,
   }));
+  return mapped.sort((a, b) => (a.imageUrl ? 0 : 1) - (b.imageUrl ? 0 : 1));
 }
 
 // ── Write (server-only, uses service role key) ──────────────────────────────

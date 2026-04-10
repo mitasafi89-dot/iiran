@@ -18,9 +18,9 @@ import { validateWithAI } from "@/lib/pipeline/ai-validation";
 import { cacheSourceResult, getStaleArticles, getResilienceAction, detectIranBlackout } from "@/lib/pipeline/resilience";
 
 // ── Pipeline timeout ────────────────────────────────────────────────────
-// Vercel serverless functions have strict timeouts (10s free, 60s pro).
-// Race the heavy pipeline against a timer so we always return data.
-const PIPELINE_TIMEOUT_MS = 8000;
+// Vercel Pro allows 60s. The sync cron handles the heavy fetching, so this
+// fallback pipeline only runs when Supabase is empty. Give it enough time.
+const PIPELINE_TIMEOUT_MS = 55000;
 
 function withTimeout<T>(promise: Promise<T>, fallback: T, ms = PIPELINE_TIMEOUT_MS): Promise<T> {
   return Promise.race([
@@ -31,8 +31,8 @@ function withTimeout<T>(promise: Promise<T>, fallback: T, ms = PIPELINE_TIMEOUT_
 
 // ── News Feed ───────────────────────────────────────────────────────────
 // Replaces: /api/news
-// Cached for 6 hours. Pipeline runs at most 4×/day.
-// Returns max 5 articles (the day's top scored).
+// Cached for 4 hours. Cron sync runs every 4 hours to keep Supabase fresh.
+// Returns max 40 articles (the day's top scored).
 
 export interface PublishedArticle {
   title: string;
@@ -154,21 +154,23 @@ async function fetchNewsPipeline(): Promise<PublishedArticle[]> {
       }))
     );
 
-    // Hard filter: no real image = no publish
-    let articles: PublishedArticle[] = enriched
-      .filter((a): a is typeof a & { imageUrl: string } => !!a.imageUrl)
-      .map((a) => ({
-        title: a.title,
-        source: a.source,
-        url: sanitizeExternalUrl(a.url) || "#",
-        publishedAt: a.publishedAt,
-        description: a.description,
-        imageUrl: a.imageUrl,
-      }));
+    // Prefer articles with images, but keep imageless ones as fallback
+    const withImages = enriched.filter((a) => !!a.imageUrl);
+    const withoutImages = enriched.filter((a) => !a.imageUrl);
+    const ordered = [...withImages, ...withoutImages];
+
+    let articles: PublishedArticle[] = ordered.map((a) => ({
+      title: a.title,
+      source: a.source,
+      url: sanitizeExternalUrl(a.url) || "#",
+      publishedAt: a.publishedAt,
+      description: a.description,
+      imageUrl: a.imageUrl,
+    }));
 
     if (articles.length === 0) {
       articles = getNewsFallback();
-      run.warnings.push("Zero articles with images; serving static fallback");
+      run.warnings.push("Zero articles after pipeline; serving static fallback");
     }
 
     run.imagesAttempted = finalScored.length;
@@ -296,20 +298,22 @@ async function fetchStoriesPipeline(): Promise<StoryData[]> {
     // Enrich stories that have no image
     const finalStories = await fillMissingImages(selected);
 
-    // Hard filter: no image = no publish
+    // Prefer stories with images, but keep imageless ones as fallback
     const withImages = finalStories.filter((s) => !!s.imageUrl);
+    const withoutImages = finalStories.filter((s) => !s.imageUrl);
+    const allFinal = [...withImages, ...withoutImages];
 
-    run.articlesPublished = withImages.length;
+    run.articlesPublished = allFinal.length;
     run.imagesAttempted = selected.length;
     run.imagesOk = withImages.length;
     run.imagesRejected = selected.length - withImages.length;
 
-    if (withImages.length === 0) {
-      run.warnings.push("Zero stories with images; serving static fallback");
+    if (allFinal.length === 0) {
+      run.warnings.push("Zero stories after pipeline; serving static fallback");
     }
 
     finalizeRun(run);
-    return withImages.length > 0 ? withImages : getStoriesFallback();
+    return allFinal.length > 0 ? allFinal : getStoriesFallback();
   } catch (e) {
     run.errors.push(e instanceof Error ? e.message : "Unknown stories error");
     finalizeRun(run);

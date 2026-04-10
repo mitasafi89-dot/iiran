@@ -13,8 +13,8 @@ const nextConfig: NextConfig = {
   cacheLife: {
     newsPipeline: {
       stale: 300,       // serve stale for 5 min while revalidating
-      revalidate: 21600, // revalidate every 6 hours
-      expire: 86400,     // expire after 1 day without traffic
+      revalidate: 14400, // revalidate every 4 hours (matches cron cycle)
+      expire: 43200,     // expire after 12 hours without traffic
     },
   },
   images: {

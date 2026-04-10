@@ -205,7 +205,10 @@ export async function getStoriesLive(): Promise<StoryData[]> {
   const deduped = unique.map((u) => (u as typeof u & { _story: StoryData })._story);
   const selected = deduped.slice(0, 40);
   const enriched = await enrichImages(selected);
-  return enriched.filter((s) => !!s.imageUrl);
+  // Prefer stories with images, keep imageless as fallback
+  const withImages = enriched.filter((s) => !!s.imageUrl);
+  const withoutImages = enriched.filter((s) => !s.imageUrl);
+  return [...withImages, ...withoutImages];
 }
 
 // ── Live news fetching ──────────────────────────────────────────────────────
@@ -262,7 +265,10 @@ export async function getNewsFeedLive(): Promise<PublishedArticle[]> {
   }));
 
   const enriched = await enrichImages(mapped);
-  return enriched.filter((a): a is typeof a & { imageUrl: string } => !!a.imageUrl);
+  // Prefer articles with images, keep imageless as fallback
+  const withImages = enriched.filter((a) => !!a.imageUrl);
+  const withoutImages = enriched.filter((a) => !a.imageUrl);
+  return [...withImages, ...withoutImages];
 }
 
 // ── RSS Source Parsers ──────────────────────────────────────────────────────

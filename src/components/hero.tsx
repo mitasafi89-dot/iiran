@@ -111,20 +111,18 @@ export function Hero({ dict, lang }: { dict: Dictionary; lang: Locale }) {
           </Link>
         </div>
 
-        <div className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-white/60 text-sm animate-fade-in [animation-delay:1200ms]">
+        <div className="mt-16 grid grid-cols-3 gap-4 sm:gap-8 max-w-md sm:max-w-lg mx-auto text-white/60 text-sm animate-fade-in [animation-delay:1200ms]">
           <div className="text-center">
-            <div className="text-2xl font-bold text-white">2.4M+</div>
-            <div>{dict.hero.peopleReached}</div>
+            <div className="text-xl sm:text-2xl font-bold text-white">2.4M+</div>
+            <div className="text-xs sm:text-sm">{dict.hero.peopleReached}</div>
           </div>
-          <div className="w-px h-10 bg-white/20 hidden sm:block" aria-hidden="true" />
-          <div className="text-center">
-            <div className="text-2xl font-bold text-white">48</div>
-            <div>{dict.hero.countriesSupporting}</div>
+          <div className="text-center border-x border-white/20">
+            <div className="text-xl sm:text-2xl font-bold text-white">48</div>
+            <div className="text-xs sm:text-sm">{dict.hero.countriesSupporting}</div>
           </div>
-          <div className="w-px h-10 bg-white/20 hidden sm:block" aria-hidden="true" />
           <div className="text-center">
-            <div className="text-2xl font-bold text-white">$18M</div>
-            <div>{dict.hero.aidDelivered}</div>
+            <div className="text-xl sm:text-2xl font-bold text-white">$18M</div>
+            <div className="text-xs sm:text-sm">{dict.hero.aidDelivered}</div>
           </div>
         </div>
         <p className="mt-3 text-xs text-white/40 animate-fade-in [animation-delay:1400ms]">
