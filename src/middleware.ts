@@ -262,7 +262,7 @@ export async function middleware(request: NextRequest) {
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https://images.unsplash.com https://upload.wikimedia.org https://i.ytimg.com https://i.guim.co.uk https://media.guim.co.uk https://reliefweb.int https://images.pexels.com https://pixabay.com https://media.mehrnews.com https://*.presstv.ir https://cdn.presstv.ir https://static.presstv.ir https://cdn-media.tass.ru https://cdnph.upi.com https://*.tehrantimes.com https://*.aljazeera.com https://*.aljazeera.net https://*.middleeasteye.net https://*.tass.com https://*.tass.ru https://*.supabase.co`,
     `font-src 'self' https://fonts.gstatic.com`,
-    `connect-src 'self' https://*.supabase.co`,
+    `connect-src 'self' https://*.supabase.co${process.env.NODE_ENV === "development" ? " ws://localhost:* wss://localhost:*" : ""}`,
     `frame-src 'none'`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
@@ -315,9 +315,11 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Permitted-Cross-Domain-Policies", "none");
 
   // Cross-Origin policies for isolation
-  response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
-  response.headers.set("Cross-Origin-Resource-Policy", "same-origin");
-  response.headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+  // NOTE: COEP "credentialless" blocks cross-origin images (Unsplash, YouTube, etc.)
+  // that don't include Cross-Origin-Resource-Policy headers, causing load failures.
+  // Use "unsafe-none" to allow cross-origin images to load normally.
+  response.headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  response.headers.set("Cross-Origin-Resource-Policy", "cross-origin");
 
   // ── Pass session classification to downstream routes ───────────────
   const sessionTag = classifySession(ip);
