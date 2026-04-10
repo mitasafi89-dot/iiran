@@ -28,27 +28,37 @@ const weeklyUpdates = [
   },
 ];
 
-const metrics: { label: string; value: string; icon: LucideIcon }[] = [
-  { label: "Families Housed This Month", value: "1,240", icon: Home },
-  { label: "Medical Consultations", value: "8,600", icon: HeartPulse },
-  { label: "Children in School Programs", value: "4,200", icon: GraduationCap },
-  { label: "Clean Water Access (people)", value: "32,000", icon: Droplets },
-];
+interface ImpactDict {
+  sectionLabel: string;
+  title: string;
+  description: string;
+  familiesHoused: string;
+  medicalConsultations: string;
+  childrenInSchool: string;
+  cleanWaterAccess: string;
+  weekOf: string;
+}
 
-export function ImpactSection() {
+export function ImpactSection({ dict }: { dict: ImpactDict }) {
+  const metrics: { label: string; value: string; icon: LucideIcon }[] = [
+    { label: dict.familiesHoused, value: "1,240", icon: Home },
+    { label: dict.medicalConsultations, value: "8,600", icon: HeartPulse },
+    { label: dict.childrenInSchool, value: "4,200", icon: GraduationCap },
+    { label: dict.cleanWaterAccess, value: "32,000", icon: Droplets },
+  ];
+
   return (
     <section id="impact" className="py-24 bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16 animate-fade-in-up">
           <p className="text-sm font-medium tracking-widest uppercase text-primary mb-2">
-            Transparent Results
+            {dict.sectionLabel}
           </p>
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-            Our Impact
+            {dict.title}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            We believe in full transparency. Here is a weekly breakdown of how your
-            support is making a tangible difference.
+            {dict.description}
           </p>
         </div>
 
@@ -76,7 +86,7 @@ export function ImpactSection() {
               className="rounded-xl border border-border bg-card p-6"
             >
               <h3 className="font-semibold text-sm mb-3 text-primary">
-                Week of {update.week}
+                {dict.weekOf.replace("{date}", update.week)}
               </h3>
               <ul className="space-y-2">
                 {update.highlights.map((highlight, j) => (

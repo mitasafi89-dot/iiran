@@ -59,11 +59,24 @@ const cities: SupportCity[] = [
   { name: "Melbourne", coords: [144.96, -37.81], supporters: "27K", region: "Oceania" },
 ];
 
+export interface MapDict {
+  sectionLabel: string;
+  title: string;
+  description: string;
+  mapAlt: string;
+  supporters: string;
+  northAmerica: string;
+  europe: string;
+  middleEast: string;
+  southAsia: string;
+  tehran: string;
+}
+
 const regions = [
-  { name: "North America", supporters: "245K" },
-  { name: "Europe", supporters: "380K" },
-  { name: "Middle East", supporters: "120K" },
-  { name: "South Asia", supporters: "95K" },
+  { key: "northAmerica" as const, supporters: "245K" },
+  { key: "europe" as const, supporters: "380K" },
+  { key: "middleEast" as const, supporters: "120K" },
+  { key: "southAsia" as const, supporters: "95K" },
 ];
 
 const TOPO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -79,7 +92,7 @@ const projection = geoNaturalEarth1()
 const pathGenerator = geoPath(projection);
 
 // ─── Component ──────────────────────────────────────────────────────────────
-export async function GlobalSupportMap() {
+export async function GlobalSupportMap({ dict }: { dict: MapDict }) {
   // Fetch world topology at build time (cached by Next.js)
   let countryPaths: string[] = [];
   try {
@@ -125,13 +138,13 @@ export async function GlobalSupportMap() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 animate-fade-in-up">
           <p className="text-sm font-medium tracking-widest uppercase text-primary mb-2">
-            Worldwide Movement
+            {dict.sectionLabel}
           </p>
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-            Global Support Network
+            {dict.title}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            People from every continent are standing together for peace and recovery.
+            {dict.description}
           </p>
         </div>
 
@@ -140,7 +153,7 @@ export async function GlobalSupportMap() {
           <svg
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
             className="w-full h-auto"
-            aria-label="World map showing global support network"
+            aria-label={dict.mapAlt}
             role="img"
           >
             {/* Sphere background */}
@@ -251,7 +264,7 @@ export async function GlobalSupportMap() {
                     textAnchor="middle"
                     className="fill-muted-foreground text-[8px]"
                   >
-                    {city.supporters} supporters
+                    {city.supporters} {dict.supporters}
                   </text>
                 </g>
               </g>
@@ -286,7 +299,7 @@ export async function GlobalSupportMap() {
                 textAnchor="middle"
                 className="fill-primary text-[10px] font-bold"
               >
-                Tehran
+                {dict.tehran}
               </text>
             </g>
           </svg>
@@ -296,11 +309,11 @@ export async function GlobalSupportMap() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mt-10 max-w-4xl mx-auto">
           {regions.map((region) => (
             <div
-              key={region.name}
+              key={region.key}
               className="text-center rounded-lg border border-border bg-card p-4"
             >
               <div className="text-lg font-bold">{region.supporters}</div>
-              <div className="text-xs text-muted-foreground">{region.name}</div>
+              <div className="text-xs text-muted-foreground">{dict[region.key]}</div>
             </div>
           ))}
         </div>

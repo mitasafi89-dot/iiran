@@ -48,29 +48,45 @@ function AnimatedCounter({ value, suffix = "" }: { value: number; suffix?: strin
   );
 }
 
-const stats: { label: string; key: keyof DashboardData; suffix: string; icon: LucideIcon }[] = [
-  { label: "People Displaced", key: "displaced", suffix: "+", icon: Home },
-  { label: "Aid Packages Delivered", key: "aidDelivered", suffix: "+", icon: Package },
-  { label: "Urgent Needs Open", key: "urgentNeeds", suffix: "", icon: AlertTriangle },
-  { label: "Medical Interventions", key: "medicalAid", suffix: "+", icon: HeartPulse },
-  { label: "Shelters Built", key: "sheltersBuilt", suffix: "+", icon: Hammer },
-  { label: "Meals Served", key: "mealsServed", suffix: "+", icon: UtensilsCrossed },
-];
+interface CrisisDict {
+  sectionLabel: string;
+  title: string;
+  description: string;
+  displaced: string;
+  aidPackages: string;
+  urgentNeeds: string;
+  medicalInterventions: string;
+  sheltersBuilt: string;
+  mealsServed: string;
+  lastUpdatedAt: string;
+  utc: string;
+  activeDisaster: string;
+  activeDisasters: string;
+  reportsOnFile: string;
+}
 
-export function CrisisDashboard({ data }: { data: DashboardData }) {
+export function CrisisDashboard({ data, dict }: { data: DashboardData; dict: CrisisDict }) {
+  const stats: { label: string; key: keyof DashboardData; suffix: string; icon: LucideIcon }[] = [
+    { label: dict.displaced, key: "displaced", suffix: "+", icon: Home },
+    { label: dict.aidPackages, key: "aidDelivered", suffix: "+", icon: Package },
+    { label: dict.urgentNeeds, key: "urgentNeeds", suffix: "", icon: AlertTriangle },
+    { label: dict.medicalInterventions, key: "medicalAid", suffix: "+", icon: HeartPulse },
+    { label: dict.sheltersBuilt, key: "sheltersBuilt", suffix: "+", icon: Hammer },
+    { label: dict.mealsServed, key: "mealsServed", suffix: "+", icon: UtensilsCrossed },
+  ];
+
   return (
     <section id="dashboard" className="py-24 bg-muted/50">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16 animate-fade-in-up">
           <p className="text-sm font-medium tracking-widest uppercase text-primary mb-2">
-            Live Crisis Data
+            {dict.sectionLabel}
           </p>
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-            Current Situation
+            {dict.title}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Real-time overview of the humanitarian situation and our response efforts.
-            Data refreshes automatically.
+            {dict.description}
           </p>
         </div>
 
@@ -97,13 +113,13 @@ export function CrisisDashboard({ data }: { data: DashboardData }) {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-8">
-          Last updated: {new Date(data.lastUpdated).toISOString().replace("T", " ").slice(0, 19) + " UTC"}
-          {data.dataSource && <> &middot; Source: {data.dataSource}</>}
+          {dict.lastUpdatedAt} {new Date(data.lastUpdated).toISOString().replace("T", " ").slice(0, 19)} {dict.utc}
+          {data.dataSource && <> &middot; {data.dataSource}</>}
           {data.activeDisasters != null && data.activeDisasters > 0 && (
-            <> &middot; {data.activeDisasters} active disaster{data.activeDisasters !== 1 ? "s" : ""} tracked</>
+            <> &middot; {data.activeDisasters} {data.activeDisasters !== 1 ? dict.activeDisasters : dict.activeDisaster}</>
           )}
           {data.recentReports != null && data.recentReports > 0 && (
-            <> &middot; {data.recentReports.toLocaleString()} reports on file</>
+            <> &middot; {data.recentReports.toLocaleString()} {dict.reportsOnFile}</>
           )}
         </p>
       </div>

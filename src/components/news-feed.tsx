@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { StoryImage } from "@/components/story-image";
+import type { Locale } from "@/lib/i18n";
 
 export interface NewsItem {
   title: string;
@@ -10,19 +11,26 @@ export interface NewsItem {
   imageUrl?: string;
 }
 
-export function NewsFeed({ articles, showViewAll = true }: { articles: NewsItem[]; showViewAll?: boolean }) {
+interface NewsDict {
+  sectionLabel: string;
+  title: string;
+  description: string;
+  viewAll: string;
+}
+
+export function NewsFeed({ articles, showViewAll = true, dict, lang }: { articles: NewsItem[]; showViewAll?: boolean; dict: NewsDict; lang: Locale }) {
   return (
     <section id="news" className="py-24 bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16 animate-fade-in-up">
           <p className="text-sm font-medium tracking-widest uppercase text-primary mb-2">
-            Stay Informed
+            {dict.sectionLabel}
           </p>
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-            Latest News
+            {dict.title}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            The latest updates on the humanitarian situation, sourced from trusted global outlets.
+            {dict.description}
           </p>
         </div>
 
@@ -65,7 +73,7 @@ export function NewsFeed({ articles, showViewAll = true }: { articles: NewsItem[
                   {article.description}
                 </p>
                 <span className="inline-block mt-3 text-xs text-primary font-medium">
-                  Read full article &rarr;
+                  {dict.viewAll} &rarr;
                 </span>
               </div>
             </a>
@@ -75,10 +83,10 @@ export function NewsFeed({ articles, showViewAll = true }: { articles: NewsItem[
         {showViewAll && (
           <div className="text-center mt-10">
             <a
-              href="/news"
+              href={`/${lang}/news`}
               className="inline-flex items-center justify-center rounded-md border border-border bg-card hover:bg-accent px-6 py-2.5 text-sm font-medium transition-colors"
             >
-              View All News
+              {dict.viewAll}
             </a>
           </div>
         )}

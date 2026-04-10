@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { StoryImage } from "@/components/story-image";
 import { Badge } from "@/components/ui/badge";
+import type { Locale } from "@/lib/i18n";
 
 export interface StoryItem {
   id: string;
@@ -16,7 +17,34 @@ export interface StoryItem {
   theme?: string;
 }
 
-export function HumanStories({ stories, showAll = false }: { stories: StoryItem[]; showAll?: boolean }) {
+interface StoriesDict {
+  sectionLabel: string;
+  title: string;
+  description: string;
+  fallbackDescription: string;
+  noStories: string;
+  viewAll: string;
+}
+
+interface CommonDict {
+  readMore: string;
+  showMore: string;
+  showLess: string;
+}
+
+export function HumanStories({
+  stories,
+  showAll = false,
+  dict,
+  commonDict,
+  lang,
+}: {
+  stories: StoryItem[];
+  showAll?: boolean;
+  dict: StoriesDict;
+  commonDict: CommonDict;
+  lang: Locale;
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const featured = stories[0];
@@ -27,21 +55,21 @@ export function HumanStories({ stories, showAll = false }: { stories: StoryItem[
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16 animate-fade-in-up">
           <p className="text-sm font-medium tracking-widest uppercase text-primary mb-2">
-            Real People, Real Impact
+            {dict.sectionLabel}
           </p>
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-            Stories of Resilience
+            {dict.title}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             {showAll
-              ? `${stories.length} stories from Iranian and international sources, showing the human side of the crisis.`
-              : "Touching human stories from Iran and the region, sourced from trusted news outlets and humanitarian organizations."}
+              ? dict.description.replace("{count}", String(stories.length))
+              : dict.fallbackDescription}
           </p>
         </div>
 
         {stories.length === 0 ? (
           <p className="text-center text-muted-foreground">
-            No stories available at this time. Check back soon.
+            {dict.noStories}
           </p>
         ) : (
           <>
@@ -73,7 +101,7 @@ export function HumanStories({ stories, showAll = false }: { stories: StoryItem[
                         </span>
                       )}
                       <time className="text-xs text-muted-foreground ml-auto">
-                        {formatDate(featured.publishedAt)}
+                        {formatDate(featured.publishedAt, lang)}
                       </time>
                     </div>
 
@@ -94,7 +122,7 @@ export function HumanStories({ stories, showAll = false }: { stories: StoryItem[
                         rel="noopener noreferrer"
                         className="text-sm text-primary hover:underline font-medium"
                       >
-                        Read full story &rarr;
+                        {commonDict.readMore} &rarr;
                       </a>
                       {featured.body && featured.body.length > featured.excerpt.length && (
                         <button
@@ -103,7 +131,7 @@ export function HumanStories({ stories, showAll = false }: { stories: StoryItem[
                           }
                           className="text-sm text-primary hover:underline font-medium"
                         >
-                          {expandedId === featured.id ? "Show less" : "Show more"}
+                          {expandedId === featured.id ? commonDict.showLess : commonDict.showMore}
                         </button>
                       )}
                     </div>
@@ -137,7 +165,7 @@ export function HumanStories({ stories, showAll = false }: { stories: StoryItem[
                         {story.source}
                       </Badge>
                       <time className="text-xs text-muted-foreground">
-                        {formatDate(story.publishedAt)}
+                        {formatDate(story.publishedAt, lang)}
                       </time>
                     </div>
 
@@ -156,7 +184,7 @@ export function HumanStories({ stories, showAll = false }: { stories: StoryItem[
                         rel="noopener noreferrer"
                         className="text-xs text-primary hover:underline font-medium"
                       >
-                        Read full story &rarr;
+                        {commonDict.readMore} &rarr;
                       </a>
                       {story.body && story.body.length > story.excerpt.length && (
                         <button
@@ -165,7 +193,7 @@ export function HumanStories({ stories, showAll = false }: { stories: StoryItem[
                           }
                           className="text-xs text-primary hover:underline font-medium"
                         >
-                          {expandedId === story.id ? "Less" : "More"}
+                          {expandedId === story.id ? commonDict.showLess : commonDict.showMore}
                         </button>
                       )}
                     </div>
@@ -179,10 +207,10 @@ export function HumanStories({ stories, showAll = false }: { stories: StoryItem[
         {!showAll && (
           <div className="text-center mt-12">
             <a
-              href="/stories"
+              href={`/${lang}/stories`}
               className="inline-flex items-center justify-center rounded-md border border-border bg-card hover:bg-accent px-6 py-2.5 text-sm font-medium transition-colors"
             >
-              View All Stories
+              {dict.viewAll}
             </a>
           </div>
         )}
@@ -191,8 +219,16 @@ export function HumanStories({ stories, showAll = false }: { stories: StoryItem[
   );
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+const localeMap: Record<string, string> = {
+  en: "en-US",
+  fa: "fa-IR",
+  ar: "ar-SA",
+  fr: "fr-FR",
+  tr: "tr-TR",
+};
+
+function formatDate(dateStr: string, lang: string): string {
+  return new Date(dateStr).toLocaleDateString(localeMap[lang] || "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

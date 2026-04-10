@@ -1,5 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Dictionary } from "@/app/[lang]/dictionaries";
+import type { Locale } from "@/lib/i18n";
 
 // ── Partner data with verifiable links ──────────────────────────────────
 const partners = [
@@ -69,7 +71,7 @@ const partnerLogos: Record<string, React.FC<{ className?: string }>> = {
   "UNICEF": UNICEFIcon,
 };
 
-export function Hero() {
+export function Hero({ dict, lang }: { dict: Dictionary; lang: Locale }) {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0B1929]">
       <Image
@@ -84,16 +86,14 @@ export function Hero() {
 
       <div className="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center animate-fade-in-up">
         <p className="text-sm sm:text-base font-medium tracking-widest uppercase text-blue-200/80 mb-4">
-          Verified 501(c)(3) Nonprofit Delivering Aid in Iran
+          {dict.hero.badge}
         </p>
         <h1 className="text-[clamp(1.75rem,5vw,4.5rem)] font-bold tracking-tight text-white leading-[1.1] mb-6">
-          Help Iran:{" "}
-          <span className="text-blue-200">Humanitarian Aid &amp; Relief for Civilians</span>
+          {dict.hero.title}{" "}
+          <span className="text-blue-200">{dict.hero.titleHighlight}</span>
         </h1>
         <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Iranians face war, sanctions, and a deepening humanitarian crisis. Donate
-          to deliver food, medical care, and shelter to civilians in need. Stand
-          with Iran through transparent, verified relief.
+          {dict.hero.description}
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up [animation-delay:300ms]">
@@ -101,41 +101,41 @@ export function Hero() {
             href="#education"
             className="inline-flex items-center justify-center rounded-md bg-blue-800 hover:bg-blue-900 px-8 py-3.5 text-base font-semibold text-white transition-colors shadow-lg shadow-blue-950/40 min-h-[44px]"
           >
-            Learn About Our Work
+            {dict.hero.ctaLearn}
           </Link>
           <Link
             href="#help"
             className="inline-flex items-center justify-center rounded-md border border-white/30 bg-white/10 backdrop-blur-sm hover:bg-white/20 px-8 py-3.5 text-base font-semibold text-white transition-colors min-h-[44px]"
           >
-            Donate
+            {dict.common.donate}
           </Link>
         </div>
 
         <div className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-white/60 text-sm animate-fade-in [animation-delay:1200ms]">
           <div className="text-center">
             <div className="text-2xl font-bold text-white">2.4M+</div>
-            <div>People Reached</div>
+            <div>{dict.hero.peopleReached}</div>
           </div>
           <div className="w-px h-10 bg-white/20 hidden sm:block" aria-hidden="true" />
           <div className="text-center">
             <div className="text-2xl font-bold text-white">48</div>
-            <div>Countries Supporting</div>
+            <div>{dict.hero.countriesSupporting}</div>
           </div>
           <div className="w-px h-10 bg-white/20 hidden sm:block" aria-hidden="true" />
           <div className="text-center">
             <div className="text-2xl font-bold text-white">$18M</div>
-            <div>Aid Delivered</div>
+            <div>{dict.hero.aidDelivered}</div>
           </div>
         </div>
         <p className="mt-3 text-xs text-white/40 animate-fade-in [animation-delay:1400ms]">
-          Source: UN OCHA &amp; partner reports, 2026
+          {dict.hero.sourceNote}
         </p>
       </div>
 
       {/* Trust bar with partner logos */}
       <div className="absolute bottom-0 left-0 right-0 bg-white/5 backdrop-blur-sm border-t border-white/10 animate-fade-in [animation-delay:1500ms]">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 sm:gap-x-6 lg:gap-x-10">
-          <span className="text-xs text-white/40 uppercase tracking-wider hidden sm:block">Data&nbsp;Partners</span>
+          <span className="text-xs text-white/40 uppercase tracking-wider hidden sm:block">{dict.hero.dataPartners}</span>
           <div className="w-px h-5 bg-white/20 hidden sm:block" aria-hidden="true" />
           {partners.map((p) => {
             const IconComponent = partnerLogos[p.abbr];

@@ -1,24 +1,31 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+interface PaginationDict {
+  label: string;
+  previous: string;
+  next: string;
+}
+
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
   basePath: string;
+  dict: PaginationDict;
 }
 
-export function Pagination({ currentPage, totalPages, basePath }: PaginationProps) {
+export function Pagination({ currentPage, totalPages, basePath, dict }: PaginationProps) {
   if (totalPages <= 1) return null;
 
   const pages = getPageNumbers(currentPage, totalPages);
 
   return (
-    <nav aria-label="Pagination" className="flex flex-wrap items-center justify-center gap-1 mt-12">
+    <nav aria-label={dict.label} className="flex flex-wrap items-center justify-center gap-1 mt-12">
       {/* Previous */}
       {currentPage > 1 ? (
         <a
           href={`${basePath}?page=${currentPage - 1}`}
           className="inline-flex items-center justify-center w-11 h-11 rounded-md border border-border bg-card hover:bg-accent transition-colors"
-          aria-label="Previous page"
+          aria-label={dict.previous}
         >
           <ChevronLeft className="w-4 h-4" />
         </a>
@@ -55,7 +62,7 @@ export function Pagination({ currentPage, totalPages, basePath }: PaginationProp
         <a
           href={`${basePath}?page=${currentPage + 1}`}
           className="inline-flex items-center justify-center w-11 h-11 rounded-md border border-border bg-card hover:bg-accent transition-colors"
-          aria-label="Next page"
+          aria-label={dict.next}
         >
           <ChevronRight className="w-4 h-4" />
         </a>

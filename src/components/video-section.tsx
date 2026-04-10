@@ -8,7 +8,13 @@ export interface VideoItem {
   publishedAt: string;
 }
 
-export function VideoSection({ videos }: { videos: VideoItem[] }) {
+interface VideoDict {
+  sectionLabel: string;
+  title: string;
+  description: string;
+}
+
+export function VideoSection({ videos, dict }: { videos: VideoItem[]; dict: VideoDict }) {
   if (!videos.length) return null;
 
   return (
@@ -16,13 +22,13 @@ export function VideoSection({ videos }: { videos: VideoItem[] }) {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16 animate-fade-in-up">
           <p className="text-sm font-medium tracking-widest uppercase text-primary mb-2">
-            Watch &amp; Share
+            {dict.sectionLabel}
           </p>
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
-            Featured Videos
+            {dict.title}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Compelling visual stories of resilience, recovery, and the human spirit.
+            {dict.description}
           </p>
         </div>
 

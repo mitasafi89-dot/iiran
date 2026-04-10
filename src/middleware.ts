@@ -22,8 +22,16 @@ import {
 
 // ============================================================================
 // EDGE MIDDLEWARE — Runs on EVERY request at the edge
-// Implements: Security headers, CSP, origin validation, deception layer
+// Implements: i18n locale routing, Security headers, CSP, origin validation, deception layer
 // ============================================================================
+
+// ── i18n constants (duplicated from lib/i18n to avoid non-edge imports) ──
+const LOCALES = ["en", "fa", "ar", "fr", "tr"] as const;
+const DEFAULT_LOCALE = "en";
+
+function isValidLocale(v: string): boolean {
+  return (LOCALES as readonly string[]).includes(v);
+}
 
 // Nonce generation for CSP (crypto available at edge)
 function generateNonce(): string {
@@ -52,10 +60,75 @@ function getIp(request: NextRequest): string {
   );
 }
 
+/** Parse Accept-Language header and return the best matching locale */
+function detectLocaleFromHeader(acceptLanguage: string | null): string {
+  if (!acceptLanguage) return DEFAULT_LOCALE;
+  const preferred = acceptLanguage
+    .split(",")
+    .map((part) => {
+      const [lang, q] = part.trim().split(";q=");
+      return { lang: lang.trim().toLowerCase(), q: q ? parseFloat(q) : 1 };
+    })
+    .sort((a, b) => b.q - a.q);
+
+  for (const { lang } of preferred) {
+    // Exact match (e.g. "fa", "tr")
+    if (isValidLocale(lang)) return lang;
+    // Prefix match (e.g. "en-US" → "en", "fr-FR" → "fr")
+    const prefix = lang.split("-")[0];
+    if (isValidLocale(prefix)) return prefix;
+  }
+  return DEFAULT_LOCALE;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const nonce = generateNonce();
   const ip = getIp(request);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // PHASE 0: i18n LOCALE ROUTING
+  // Skip for static assets, API routes, admin routes, and Next.js internals.
+  // Redirect bare paths (e.g. /about) to /{locale}/about.
+  // ══════════════════════════════════════════════════════════════════════
+
+  const isInternalOrApi =
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/icon.svg" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    pathname.endsWith(".ico") ||
+    pathname.endsWith(".png") ||
+    pathname.endsWith(".jpg") ||
+    pathname.endsWith(".svg");
+
+  if (!isInternalOrApi) {
+    // Check if pathname already starts with a valid locale
+    const segments = pathname.split("/");
+    const firstSegment = segments[1]; // e.g. "en" from "/en/about"
+    const pathnameHasLocale = firstSegment && isValidLocale(firstSegment);
+
+    if (!pathnameHasLocale) {
+      // Detect preferred locale: cookie > Accept-Language > default
+      const cookieLocale = request.cookies.get("NEXT_LOCALE")?.value;
+      let locale = DEFAULT_LOCALE;
+      if (cookieLocale && isValidLocale(cookieLocale)) {
+        locale = cookieLocale;
+      } else {
+        locale = detectLocaleFromHeader(
+          request.headers.get("accept-language")
+        );
+      }
+
+      // Redirect to /{locale}{pathname}
+      const url = request.nextUrl.clone();
+      url.pathname = `/${locale}${pathname}`;
+      return NextResponse.redirect(url);
+    }
+  }
 
   // ══════════════════════════════════════════════════════════════════════
   // PHASE 1: DECEPTION LAYER — Only for non-asset, non-page requests
@@ -375,6 +448,6 @@ function sleep(ms: number): Promise<void> {
 export const config = {
   matcher: [
     // Match all routes except static files and Next.js internals
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon\\.svg|robots.txt|sitemap.xml).*)",
   ],
 };
