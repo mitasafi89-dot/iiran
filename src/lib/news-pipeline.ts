@@ -352,13 +352,18 @@ function extractDomain(url: string): string {
   }
 }
 
+// ── Field length caps — prevent runaway regex/string ops on hostile input ──
+const MAX_TITLE_LEN = 500;
+const MAX_DESC_LEN = 2_000;
+const MAX_FULL_TEXT_LEN = 20_000;
+
 // ── Main Scoring Function ──────────────────────────────────────────────────
 
 export function scoreArticle(article: RawArticle): ScoredArticle {
   const combinedText = [
-    article.title,
-    article.description,
-    article.fullText || "",
+    article.title.slice(0, MAX_TITLE_LEN),
+    article.description.slice(0, MAX_DESC_LEN),
+    (article.fullText || "").slice(0, MAX_FULL_TEXT_LEN),
   ].join(" ");
 
   const scores: ScoreBreakdown = {

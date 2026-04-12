@@ -65,18 +65,27 @@ interface RSSItem {
 }
 
 function stripHTML(html: string): string {
-  // First decode entities so we catch all tags
+  // Decode the most common entities first
   let text = html
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
-  // Strip all tags (handles attributes with > inside quoted values)
-  text = text.replace(/<[^>]*?("[^"]*"|'[^']*')*[^>]*?>/g, "");
-  // Fallback: remove anything that still looks like a tag
-  text = text.replace(/<\/?[a-z][^]*?>/gi, "");
-  return text.replace(/\s+/g, " ").trim();
+  // Linear-time tag removal: consume one character at a time inside < ... >.
+  // Avoids catastrophic backtracking from nested quantifiers in the old regex.
+  let out = "";
+  let inTag = false;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "<") {
+      inTag = true;
+    } else if (text[i] === ">" && inTag) {
+      inTag = false;
+    } else if (!inTag) {
+      out += text[i];
+    }
+  }
+  return out.replace(/\s+/g, " ").trim();
 }
 
 /** Extract the first <img src="..."> from an RSS item's description or content:encoded */

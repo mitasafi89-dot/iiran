@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { type NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { revalidateTag } from "next/cache";
 import { syncStoriesToDB, syncNewsToDB, reEnrichNewsImages, reEnrichStoryImages } from "@/lib/supabase-data";
@@ -15,17 +16,32 @@ export const maxDuration = 60;
 
 // ── Auth helpers ────────────────────────────────────────────────────────────
 
+function safeCompare(a: string, b: string): boolean {
+  // Always compare buffers of equal length to prevent length-based timing leaks
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) {
+    // Compare against itself to consume constant time, then return false
+    timingSafeEqual(aBuf, aBuf);
+    return false;
+  }
+  return timingSafeEqual(aBuf, bBuf);
+}
+
 function verifyCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return false;
   const authHeader = req.headers.get("authorization");
-  return authHeader === `Bearer ${cronSecret}`;
+  if (!authHeader) return false;
+  return safeCompare(authHeader, `Bearer ${cronSecret}`);
 }
 
 function verifyManualAuth(req: NextRequest): boolean {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) return false;
   const authHeader = req.headers.get("authorization");
-  const expected = `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`;
-  return !!authHeader && authHeader === expected;
+  if (!authHeader) return false;
+  return safeCompare(authHeader, `Bearer ${serviceKey}`);
 }
 
 // ── Shared sync logic ───────────────────────────────────────────────────────

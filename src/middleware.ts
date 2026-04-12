@@ -40,6 +40,27 @@ function generateNonce(): string {
   return btoa(String.fromCharCode(...array));
 }
 
+// ── Edge-local rate limiter for /api/img ──────────────────────────────────
+// Each Vercel edge instance is long-lived within a region; this counter is
+// shared across all requests routed to the same instance. It won't enforce
+// limits across regions, but it caps runaway abuse from a single source on
+// the same edge node, which is the common case.
+// Limit: 60 requests per IP per 60-second window.
+const IMG_RATE_LIMIT = 60;
+const IMG_RATE_WINDOW_MS = 60_000;
+const imgRateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function checkImgRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = imgRateLimitStore.get(ip);
+  if (!entry || now > entry.resetAt) {
+    imgRateLimitStore.set(ip, { count: 1, resetAt: now + IMG_RATE_WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= IMG_RATE_LIMIT;
+}
+
 // Allowed origins for API requests
 const ALLOWED_ORIGINS = new Set([
   "https://iiran.org",
@@ -221,6 +242,16 @@ export async function middleware(request: NextRequest) {
   // PHASE 2: STANDARD SECURITY — Origin validation, headers
   // ══════════════════════════════════════════════════════════════════════
 
+  // ── Rate limiting for image proxy ─────────────────────────────────
+  if (pathname === "/api/img") {
+    if (!checkImgRateLimit(ip)) {
+      return new NextResponse(null, {
+        status: 429,
+        headers: { "Retry-After": "60" },
+      });
+    }
+  }
+
   // ── Origin validation for mutating API requests ────────────────────
   if (pathname.startsWith("/api/")) {
     const origin = request.headers.get("origin");
@@ -243,24 +274,23 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.next();
+  // ── Forward nonce to server components via request header mutation ────
+  // SECURITY: Nonces must NOT be in response headers — browsers can read them,
+  // allowing XSS to bypass CSP entirely. Use request header mutation so only
+  // Next.js server components (via `headers()`) can read it.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
 
-  // ── Pass nonce to downstream via request header (NOT response header) --
-  // SECURITY: Never expose the nonce in a response header. Leaked nonces
-  // allow an attacker with partial XSS to bypass CSP entirely.
-  // Use request headers or Next.js metadata instead.
-  response.headers.set("x-nonce", nonce);
-  // TODO: Migrate to Next.js built-in nonce propagation and remove this
-  // response header. For now it remains for hydration compatibility.
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   // ── Content Security Policy ────────────────────────────────────────
-  // NOTE: Nonce-based CSP is incompatible with Vercel's prerendered/cached
-  // pages because the HTML is generated at build time without middleware nonces.
-  // Using 'self' for script-src instead. Inline scripts are handled by
-  // 'strict-dynamic' which trusts scripts loaded by already-trusted scripts.
+  // Nonce-based CSP: the nonce is injected per-request and applied to all
+  // inline <script> tags in server components (layout.tsx reads x-nonce via
+  // headers()). In CSP Level 2+ browsers, 'unsafe-inline' is IGNORED when a
+  // nonce is present, so inline scripts without the nonce are blocked.
   const csp = [
     `default-src 'self'`,
-    `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https://images.unsplash.com https://upload.wikimedia.org https://i.ytimg.com https://i.guim.co.uk https://media.guim.co.uk https://reliefweb.int https://images.pexels.com https://pixabay.com https://media.mehrnews.com https://*.presstv.ir https://cdn.presstv.ir https://static.presstv.ir https://cdn-media.tass.ru https://cdnph.upi.com https://*.tehrantimes.com https://*.aljazeera.com https://*.aljazeera.net https://*.middleeasteye.net https://*.tass.com https://*.tass.ru https://*.supabase.co`,
     `font-src 'self' https://fonts.gstatic.com`,

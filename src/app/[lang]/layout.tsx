@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Vazirmatn } from "next/font/google";
+import { headers } from "next/headers";
 import "../globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/header";
@@ -185,6 +186,7 @@ export default async function LangLayout({
   const locale = lang as Locale;
   const rtl = isRtl(locale);
   const dict = await getDictionary(locale);
+  const nonce = (await headers()).get("x-nonce") ?? "";
   const fontClass = rtl
     ? `${inter.variable} ${vazirmatn.variable}`
     : inter.variable;
@@ -209,6 +211,7 @@ export default async function LangLayout({
         />
         <script
           type="application/ld+json"
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
