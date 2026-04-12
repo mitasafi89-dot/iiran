@@ -308,8 +308,9 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
       if (result.status !== "fulfilled" || !result.value) continue;
       const html = result.value;
 
+      // Bounded to 800 chars to prevent matching across article boundaries
       const linkImgRegex =
-        /<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]*?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi;
+        /<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]{0,800}?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi;
       let match: RegExpExecArray | null;
       while ((match = linkImgRegex.exec(html)) !== null) {
         const artId = match[1].match(/\/(\d{5,})\//)?.[1];
@@ -317,13 +318,9 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
         imageMap.set(artId, `https:${match[2]}`);
       }
 
-      const imgLinkRegex =
-        /<img[^>]+src=["']?(\/\/cdn\.presstv\.ir\/Photo[^"'\s>]+)["']?[\s\S]*?<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?/gi;
-      while ((match = imgLinkRegex.exec(html)) !== null) {
-        const artId = match[2].match(/\/(\d{5,})\//)?.[1];
-        if (!artId || imageMap.has(artId)) continue;
-        imageMap.set(artId, `https:${match[1]}`);
-      }
+      // Note: reverse regex (<img> before <a>) was removed — Press TV always nests
+      // images inside <a> tags, and the reverse pattern caused cross-article
+      // contamination (matching an image from one article to a different article's link).
     }
 
     // Get RSS articles (has titles/descriptions but no images)
@@ -674,8 +671,80 @@ export function fetchAlMonitor(): Promise<RawArticle[]> {
 }
 
 // === 41. Anadolu Agency (Turkey) ===
-export function fetchAnadoluAgency(): Promise<RawArticle[]> {
-  return fetchRSS(APIs.rssFeeds.anadoluAgency, "anadoluagency", "Anadolu Agency", iranFilter);
+// AA uses Next.js — article detail pages render og:image client-side only.
+// Listing pages (homepage, section pages) have server-rendered article thumbnails.
+// We scrape listing pages for image map, then apply to RSS articles.
+
+const AA_LISTING_PAGES = [
+  "https://www.aa.com.tr/en",
+  "https://www.aa.com.tr/en/world",
+  "https://www.aa.com.tr/en/middle-east",
+  "https://www.aa.com.tr/en/americas",
+  "https://www.aa.com.tr/en/asia-pacific",
+  "https://www.aa.com.tr/en/us-israel-iran-war",
+];
+
+const AA_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+/** Extract article ID from AA URL path: /en/category/slug/NUMERIC_ID */
+function aaArticleId(url: string): string | undefined {
+  return url.match(/\/(\d{5,})(?:\/?\s*$|["'])/)?.[1] || url.match(/\/(\d{5,})\/?$/)?.[1];
+}
+
+function extractAnadoluImages(html: string, map: Map<string, string>) {
+  // Forward: <a href=/en/.../ID> ... <img src=cdnprod...>
+  for (const m of html.matchAll(/<a[^>]+href=["']?(\/en\/[^"'\s>]+\/(\d{5,}))["']?[^>]*>[\s\S]{0,800}?(?:src|data-src)=["']?(https?:\/\/(?:web-cdnprod|cdnuploads)\.aa\.com\.tr[^"'\s>]+)["']?/gi)) {
+    const id = m[2];
+    let imgUrl = m[3];
+    // Prefer larger thumbnail: replace thumbs_s_c with thumbs_b_c
+    imgUrl = imgUrl.replace(/thumbs_s_c_/, "thumbs_b_c_");
+    if (!map.has(id)) map.set(id, imgUrl);
+  }
+}
+
+export async function fetchAnadoluAgency(): Promise<RawArticle[]> {
+  if (isCircuitOpen("anadoluagency")) return [];
+  const t0 = Date.now();
+  try {
+    // Fetch RSS + listing pages in parallel
+    const [rssResult, ...pageResults] = await Promise.allSettled([
+      fetchRSS(APIs.rssFeeds.anadoluAgency, "anadoluagency_rss", "Anadolu Agency", iranFilter),
+      ...AA_LISTING_PAGES.map((url) =>
+        fetch(url, {
+          signal: AbortSignal.timeout(10000),
+          headers: { "User-Agent": AA_UA, Accept: "text/html" },
+        }).then((r) => (r.ok ? r.text() : ""))
+      ),
+    ]);
+
+    // Build image map from listing pages
+    const imageMap = new Map<string, string>();
+    for (const r of pageResults) {
+      if (r.status === "fulfilled" && r.value) {
+        extractAnadoluImages(r.value as string, imageMap);
+      }
+    }
+
+    // Get RSS articles
+    const rssArticles =
+      rssResult.status === "fulfilled" ? rssResult.value : [];
+
+    // Apply image map to RSS articles
+    for (const article of rssArticles) {
+      if (article.imageUrl) continue; // already has image
+      const id = article.url.match(/\/(\d{5,})\/?$/)?.[1];
+      if (id && imageMap.has(id)) {
+        article.imageUrl = imageMap.get(id);
+      }
+    }
+
+    recordSuccess("anadoluagency", Date.now() - t0);
+    return rssArticles;
+  } catch (e) {
+    recordFailure("anadoluagency");
+    return [];
+  }
 }
 
 // === 42. WAFA (Palestinian news) ===

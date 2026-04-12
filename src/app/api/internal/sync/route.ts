@@ -8,7 +8,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { revalidateTag } from "next/cache";
-import { syncStoriesToDB, syncNewsToDB } from "@/lib/supabase-data";
+import { syncStoriesToDB, syncNewsToDB, reEnrichNewsImages, reEnrichStoryImages } from "@/lib/supabase-data";
 
 // Allow up to 60s for the sync pipeline (Vercel Pro limit)
 export const maxDuration = 60;
@@ -64,6 +64,22 @@ async function runSync() {
   revalidateTag("dashboard-data", "max");
   revalidateTag("videos-data", "max");
   revalidatePath("/", "layout");
+
+  // Re-enrich existing DB articles that still lack images (backfill)
+  try {
+    const [newsEnriched, storiesEnriched] = await Promise.all([
+      reEnrichNewsImages(10),
+      reEnrichStoryImages(10),
+    ]);
+    if (newsEnriched > 0 || storiesEnriched > 0) {
+      results.reEnrich = { news: newsEnriched, stories: storiesEnriched };
+      // Re-invalidate if we found new images
+      revalidateTag("news-data", "max");
+      revalidateTag("stories-data", "max");
+    }
+  } catch (e) {
+    results.reEnrich = { error: e instanceof Error ? e.message : "Re-enrichment failed" };
+  }
 
   return results;
 }

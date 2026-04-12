@@ -52,6 +52,23 @@ export async function getNewsFeed(): Promise<PublishedArticle[]> {
   try {
     const dbArticles = await getNewsFromDB();
     if (dbArticles && dbArticles.length > 0) {
+      // If many news articles lack images, enrich with og:image scraping
+      const missing = dbArticles.filter((a) => !a.imageUrl);
+      if (missing.length > 0) {
+        try {
+          // Skip Press TV (detail pages timeout) — limit to 15 to keep response fast
+          const toScrape = missing.filter((a) => !a.url.includes("presstv.ir")).slice(0, 15);
+          const ogResults = await Promise.allSettled(
+            toScrape.map((a) => scrapeOgImage(a.url))
+          );
+          for (let i = 0; i < toScrape.length; i++) {
+            const result = ogResults[i];
+            if (result?.status === "fulfilled" && result.value) {
+              toScrape[i].imageUrl = result.value;
+            }
+          }
+        } catch { /* scraping failed, serve what we have */ }
+      }
       return dbArticles;
     }
   } catch {
@@ -361,6 +378,8 @@ const TRUSTED_IMAGE_CDNS = [
   "i.ytimg.com",
   "images.unsplash.com",
   "images.pexels.com",
+  "web-cdnprod.aa.com.tr",
+  "cdnuploads.aa.com.tr",
 ];
 
 function isTrustedImageCdn(url: string): boolean {
@@ -503,7 +522,7 @@ async function fillMissingImages(stories: StoryData[]): Promise<StoryData[]> {
   // Layer 2: Try og:image scraping for stories without images (max 25 concurrent)
   // Skip Press TV articles — their detail pages time out (anti-bot)
   if (needsImage.length > 0) {
-    const MAX_SCRAPE = 25;
+    const MAX_SCRAPE = 40;
     const toScrape = needsImage.filter((s) => !s.url.includes("presstv.ir")).slice(0, MAX_SCRAPE);
     const ogResults = await Promise.allSettled(
       toScrape.map((story) => scrapeOgImage(story.url))
@@ -548,7 +567,7 @@ async function enrichWithOgImages(
   const needsImage = articles.filter((a) => !a.imageUrl);
 
   if (needsImage.length > 0) {
-    const MAX_SCRAPE = 25;
+    const MAX_SCRAPE = 40;
     // Skip Press TV articles — their detail pages time out (anti-bot)
     const toScrape = needsImage.filter((a) => !a.url.includes("presstv.ir")).slice(0, MAX_SCRAPE);
     const ogResults = await Promise.allSettled(
@@ -665,7 +684,8 @@ function pressTVArticleId(path: string): string | undefined {
 
 function extractPressTVImages(html: string, map: Map<string, string>) {
   // Forward: <a href=/Detail/...> ... <img src=//cdn.presstv.ir/...>
-  for (const m of html.matchAll(/<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]*?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi)) {
+  // Bounded to 800 chars to prevent matching across article boundaries
+  for (const m of html.matchAll(/<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]{0,800}?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi)) {
     const id = pressTVArticleId(m[1]);
     if (!id) continue;
     let imgUrl = m[2];
@@ -673,15 +693,9 @@ function extractPressTVImages(html: string, map: Map<string, string>) {
     imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
     if (!map.has(id)) map.set(id, imgUrl);
   }
-  // Reverse: <img src=//cdn.presstv.ir/...> ... <a href=/Detail/...>
-  for (const m of html.matchAll(/<img[^>]+src=["']?(\/\/cdn\.presstv\.ir\/Photo[^"'\s>]+)["']?[\s\S]*?<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?/gi)) {
-    const id = pressTVArticleId(m[2]);
-    if (!id) continue;
-    let imgUrl = m[1];
-    if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
-    imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
-    if (!map.has(id)) map.set(id, imgUrl);
-  }
+  // Note: reverse regex (<img> before <a>) was removed — Press TV always nests
+  // images inside <a> tags, and the reverse pattern caused cross-article
+  // contamination (matching an image from one article to a different article's link).
 }
 
 async function scrapePressTVImageMap(): Promise<Map<string, string>> {
