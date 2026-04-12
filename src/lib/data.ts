@@ -248,11 +248,11 @@ export async function getStories(): Promise<StoryData[]> {
         try {
           const imageMap = await scrapePressTVImageMap();
           for (const story of missingPtv) {
-            try {
-              const path = new URL(story.url, "https://www.presstv.ir").pathname;
-              const img = imageMap.get(path);
+            const artId = pressTVArticleId(story.url);
+            if (artId) {
+              const img = imageMap.get(artId);
               if (img) story.imageUrl = img;
-            } catch { /* ignore malformed URLs */ }
+            }
           }
         } catch { /* scraping failed, serve what we have */ }
       }
@@ -653,24 +653,33 @@ const PRESSTV_PAGES = [
   "https://www.presstv.ir/Section/10101/2", // Politics p2
   "https://www.presstv.ir/Section/10106/2", // Defense p2
   "https://www.presstv.ir/Section/10104/2", // Middle East p2
+  "https://www.presstv.ir/Section/13006/2", // Editor's Choice p2
+  "https://www.presstv.ir/Section/10106/3", // Defense p3
 ];
+
+/** Extract article ID (e.g. "766597") from a Press TV URL path */
+function pressTVArticleId(path: string): string | undefined {
+  return path.match(/\/(\d{5,})\//)?.[1];
+}
 
 function extractPressTVImages(html: string, map: Map<string, string>) {
   // Forward: <a href=/Detail/...> ... <img src=//cdn.presstv.ir/...>
   for (const m of html.matchAll(/<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]*?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi)) {
-    const path = m[1];
+    const id = pressTVArticleId(m[1]);
+    if (!id) continue;
     let imgUrl = m[2];
     if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
     imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
-    if (!map.has(path)) map.set(path, imgUrl);
+    if (!map.has(id)) map.set(id, imgUrl);
   }
   // Reverse: <img src=//cdn.presstv.ir/...> ... <a href=/Detail/...>
   for (const m of html.matchAll(/<img[^>]+src=["']?(\/\/cdn\.presstv\.ir\/Photo[^"'\s>]+)["']?[\s\S]*?<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?/gi)) {
-    const path = m[2];
+    const id = pressTVArticleId(m[2]);
+    if (!id) continue;
     let imgUrl = m[1];
     if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
     imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
-    if (!map.has(path)) map.set(path, imgUrl);
+    if (!map.has(id)) map.set(id, imgUrl);
   }
 }
 
@@ -726,13 +735,11 @@ async function fetchPressTVStories(): Promise<StoryData[]> {
         ? desc?.match(/<img[^>]+src="([^"]+)"/)?.[1]
         : undefined;
 
-      // Try RSS image first, then homepage image map
+      // Try RSS image first, then homepage image map (keyed by article ID)
       let imageUrl = enclosure || descImg;
       if (!imageUrl && link) {
-        try {
-          const path = new URL(link, "https://www.presstv.ir").pathname;
-          imageUrl = imageMap.get(path);
-        } catch { /* ignore malformed URLs */ }
+        const artId = pressTVArticleId(link);
+        if (artId) imageUrl = imageMap.get(artId);
       }
 
       stories.push({

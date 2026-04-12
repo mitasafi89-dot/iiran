@@ -274,7 +274,7 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
     const PRESSTV_UA =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
-    // Pages to scrape for images: homepage + key sections (page 1 + 2)
+    // Pages to scrape for images: homepage + key sections (page 1 + 2 + 3)
     const scrapeUrls = [
       "https://www.presstv.ir",
       "https://www.presstv.ir/Section/10101",   // Politics
@@ -286,6 +286,8 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
       "https://www.presstv.ir/Section/10101/2", // Politics p2
       "https://www.presstv.ir/Section/10106/2", // Defense p2
       "https://www.presstv.ir/Section/10104/2", // Middle East p2
+      "https://www.presstv.ir/Section/13006/2", // Editor's Choice p2
+      "https://www.presstv.ir/Section/10106/3", // Defense p3
     ];
 
     // Fetch all listing pages + RSS in parallel
@@ -299,7 +301,7 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
       ),
     ]);
 
-    // Extract image map from all listing pages
+    // Extract image map from all listing pages (keyed by article ID for robust matching)
     const imageMap = new Map<string, string>();
     for (const result of pageResults) {
       if (result.status !== "fulfilled" || !result.value) continue;
@@ -309,19 +311,17 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
         /<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]*?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi;
       let match: RegExpExecArray | null;
       while ((match = linkImgRegex.exec(html)) !== null) {
-        const articlePath = match[1].replace(/^https?:\/\/[^/]+/, "");
-        if (!imageMap.has(articlePath)) {
-          imageMap.set(articlePath, `https:${match[2]}`);
-        }
+        const artId = match[1].match(/\/(\d{5,})\//)?.[1];
+        if (!artId || imageMap.has(artId)) continue;
+        imageMap.set(artId, `https:${match[2]}`);
       }
 
       const imgLinkRegex =
         /<img[^>]+src=["']?(\/\/cdn\.presstv\.ir\/Photo[^"'\s>]+)["']?[\s\S]*?<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?/gi;
       while ((match = imgLinkRegex.exec(html)) !== null) {
-        const articlePath = match[2].replace(/^https?:\/\/[^/]+/, "");
-        if (!imageMap.has(articlePath)) {
-          imageMap.set(articlePath, `https:${match[1]}`);
-        }
+        const artId = match[2].match(/\/(\d{5,})\//)?.[1];
+        if (!artId || imageMap.has(artId)) continue;
+        imageMap.set(artId, `https:${match[1]}`);
       }
     }
 
@@ -329,10 +329,10 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
     const rssItems =
       rssResult.status === "fulfilled" ? rssResult.value : [];
 
-    // Merge: attach listing-page images to RSS articles by matching URL paths
+    // Merge: attach listing-page images to RSS articles by matching article IDs
     const articles: RawArticle[] = rssItems.map((article) => {
-      const urlPath = new URL(article.url).pathname;
-      const cdnImage = imageMap.get(urlPath);
+      const artId = article.url.match(/\/(\d{5,})\//)?.[1];
+      const cdnImage = artId ? imageMap.get(artId) : undefined;
       return {
         ...article,
         sourceId: "presstv", // override the _rss suffix
@@ -342,26 +342,6 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
 
     // Add listing-page-only articles not in RSS (e.g. featured/top stories)
     if (imageMap.size > 0) {
-      const rssUrls = new Set(articles.map((a) => new URL(a.url).pathname));
-      for (const [path, imgUrl] of imageMap) {
-        if (path.startsWith("_added_") || !path.startsWith("/Detail/")) continue;
-        if (rssUrls.has(path)) continue;
-        // We have image but need to construct a minimal article
-        const slug = path.split("/").pop() || "";
-        const title = slug
-          .replace(/-/g, " ")
-          .replace(/\b\w/g, (c) => c.toUpperCase());
-        if (title.length < 10) continue;
-        articles.push({
-          title,
-          description: "",
-          source: "Press TV",
-          sourceId: "presstv",
-          url: sanitizeExternalUrl(`https://www.presstv.ir${path}`) || `https://www.presstv.ir${path}`,
-          publishedAt: new Date().toISOString(),
-          imageUrl: imgUrl,
-        });
-      }
     }
 
     if (articles.length > 0) {
