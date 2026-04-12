@@ -284,13 +284,14 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   // ── Content Security Policy ────────────────────────────────────────
-  // Nonce-based CSP: the nonce is injected per-request and applied to all
-  // inline <script> tags in server components (layout.tsx reads x-nonce via
-  // headers()). In CSP Level 2+ browsers, 'unsafe-inline' is IGNORED when a
-  // nonce is present, so inline scripts without the nonce are blocked.
+  // NOTE: Nonce-based CSP is incompatible with this app's statically
+  // prerendered pages — the HTML is generated at build time without
+  // middleware nonces, so scripts lack a nonce attribute and would be
+  // blocked by CSP2+ browsers. 'unsafe-inline' is therefore required.
+  // Removing it would silently break hydration on all static routes.
   const csp = [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'unsafe-inline'`,
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https://images.unsplash.com https://upload.wikimedia.org https://i.ytimg.com https://i.guim.co.uk https://media.guim.co.uk https://reliefweb.int https://images.pexels.com https://pixabay.com https://media.mehrnews.com https://*.presstv.ir https://cdn.presstv.ir https://static.presstv.ir https://cdn-media.tass.ru https://cdnph.upi.com https://*.tehrantimes.com https://*.aljazeera.com https://*.aljazeera.net https://*.middleeasteye.net https://*.tass.com https://*.tass.ru https://*.supabase.co`,
     `font-src 'self' https://fonts.gstatic.com`,
