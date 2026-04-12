@@ -7,6 +7,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { syncStoriesToDB, syncNewsToDB } from "@/lib/supabase-data";
 
 // Allow up to 60s for the sync pipeline (Vercel Pro limit)
@@ -58,6 +59,10 @@ async function runSync() {
   }
 
   // Invalidate cached pages so the next visitor gets fresh content
+  revalidateTag("news-data", "max");
+  revalidateTag("stories-data", "max");
+  revalidateTag("dashboard-data", "max");
+  revalidateTag("videos-data", "max");
   revalidatePath("/", "layout");
 
   return results;

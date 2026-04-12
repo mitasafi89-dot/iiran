@@ -80,7 +80,7 @@ export function HumanStories({
                   {/* Image side */}
                   <div className="relative aspect-[4/3] lg:aspect-auto bg-muted overflow-hidden">
                     <StoryImage
-                      src={featured.imageUrl!}
+                      src={featured.imageUrl || ""}
                       alt={featured.title}
                       fill
                       preload
@@ -151,7 +151,7 @@ export function HumanStories({
                   {/* Card image */}
                   <div className="relative aspect-[16/10] bg-muted overflow-hidden">
                     <StoryImage
-                      src={story.imageUrl!}
+                      src={story.imageUrl || ""}
                       alt={story.title}
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

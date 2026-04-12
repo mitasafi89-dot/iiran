@@ -45,7 +45,7 @@ export function NewsFeed({ articles, showViewAll = true, dict, lang }: { article
             >
               <div className="relative aspect-[16/10] bg-muted overflow-hidden">
                 <StoryImage
-                  src={article.imageUrl!}
+                  src={article.imageUrl || ""}
                   alt={article.title}
                   fill
                   preload={i < 3}

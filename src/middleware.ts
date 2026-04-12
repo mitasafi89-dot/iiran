@@ -148,8 +148,10 @@ export async function middleware(request: NextRequest) {
     pathname.endsWith(".js");
 
   // Only run the deception layer on honeypot-eligible paths and API routes
+  // Exclude /api/internal/sync (Vercel Cron) from deception to prevent interference
   const isDeceptionTarget =
-    !isStaticOrInternal && (
+    !isStaticOrInternal &&
+    pathname !== "/api/internal/sync" && (
       isTripwire(pathname) ||
       pathname.startsWith("/api/v1/") ||
       pathname.startsWith("/api/graphql") ||

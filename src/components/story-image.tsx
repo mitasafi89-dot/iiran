@@ -25,6 +25,9 @@ interface StoryImageProps {
  *   Subsequent loads: served from Next.js optimization cache.
  */
 export function StoryImage({ src, alt, fill, sizes, className, preload }: StoryImageProps) {
+  if (!src) return (
+    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-muted to-primary/5" />
+  );
   const isSupabase = src.includes("supabase.co/storage/");
   const imageSrc = isSupabase ? src : `/api/img?url=${encodeURIComponent(src)}`;
   const [loaded, setLoaded] = useState(false);

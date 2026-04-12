@@ -10,7 +10,7 @@ import { fetchAllSources, concatChunks } from "@/lib/news-fetchers";
 import { runPipeline } from "@/lib/news-pipeline";
 import { sanitizeExternalUrl } from "@/lib/security";
 import type { ScoredArticle } from "@/lib/news-pipeline";
-import { cacheLife } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 import { deduplicateArticles, clusterArticles } from "@/lib/pipeline/dedup";
 import { createRun, finalizeRun } from "@/lib/pipeline/observe";
 import { getStoriesFromDB, getNewsFromDB } from "@/lib/supabase-data";
@@ -46,6 +46,7 @@ export interface PublishedArticle {
 export async function getNewsFeed(): Promise<PublishedArticle[]> {
   "use cache";
   cacheLife("newsPipeline");
+  cacheTag("news-data");
 
   // Try Supabase first
   try {
@@ -234,6 +235,7 @@ export interface StoryData {
 export async function getStories(): Promise<StoryData[]> {
   "use cache";
   cacheLife("newsPipeline");
+  cacheTag("stories-data");
 
   // Try Supabase first
   try {
@@ -870,6 +872,7 @@ export interface DashboardResult {
 export async function getDashboardData(): Promise<DashboardResult> {
   "use cache";
   cacheLife("newsPipeline");
+  cacheTag("dashboard-data");
 
   const rwData = await withTimeout(
     fetchReliefWebCounts(),
@@ -971,6 +974,7 @@ const IRAN_VIDEO_KEYWORDS = [
 export async function getVideos(): Promise<VideoData[]> {
   "use cache";
   cacheLife("newsPipeline");
+  cacheTag("videos-data");
 
   return withTimeout(fetchVideosPipeline(), getVideosFallback());
 }
