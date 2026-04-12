@@ -485,22 +485,20 @@ async function scrapeOgImage(articleUrl: string): Promise<string | null> {
 async function fillMissingImages(stories: StoryData[]): Promise<StoryData[]> {
   const needsImage = stories.filter((s) => !s.imageUrl);
 
-  // Layer 2: Try og:image scraping for stories without images (max 15 concurrent)
+  // Layer 2: Try og:image scraping for stories without images (max 25 concurrent)
+  // Skip Press TV articles — their detail pages time out (anti-bot)
   if (needsImage.length > 0) {
     const MAX_SCRAPE = 25;
-    const toScrape = needsImage.slice(0, MAX_SCRAPE);
+    const toScrape = needsImage.filter((s) => !s.url.includes("presstv.ir")).slice(0, MAX_SCRAPE);
     const ogResults = await Promise.allSettled(
       toScrape.map((story) => scrapeOgImage(story.url))
     );
 
     let idx = 0;
-    for (const story of stories) {
-      if (story.imageUrl) continue;
-      if (idx < MAX_SCRAPE) {
-        const result = ogResults[idx];
-        if (result?.status === "fulfilled" && result.value) {
-          story.imageUrl = result.value;
-        }
+    for (const story of toScrape) {
+      const result = ogResults[idx];
+      if (result?.status === "fulfilled" && result.value) {
+        story.imageUrl = result.value;
       }
       idx++;
     }
@@ -536,19 +534,17 @@ async function enrichWithOgImages(
 
   if (needsImage.length > 0) {
     const MAX_SCRAPE = 25;
-    const toScrape = needsImage.slice(0, MAX_SCRAPE);
+    // Skip Press TV articles — their detail pages time out (anti-bot)
+    const toScrape = needsImage.filter((a) => !a.url.includes("presstv.ir")).slice(0, MAX_SCRAPE);
     const ogResults = await Promise.allSettled(
       toScrape.map((a) => scrapeOgImage(a.url))
     );
 
     let idx = 0;
-    for (const article of articles) {
-      if (article.imageUrl) continue;
-      if (idx < MAX_SCRAPE) {
-        const result = ogResults[idx];
-        if (result?.status === "fulfilled" && result.value) {
-          article.imageUrl = result.value;
-        }
+    for (const article of toScrape) {
+      const result = ogResults[idx];
+      if (result?.status === "fulfilled" && result.value) {
+        article.imageUrl = result.value;
       }
       idx++;
     }
@@ -630,35 +626,56 @@ async function fetchTehranTimesStories(): Promise<StoryData[]> {
  * Press TV RSS contains zero image data, but the homepage pairs articles with
  * images from cdn.presstv.ir.
  */
+// Press TV section pages that list articles with images (page 1 + 2 for broad coverage)
+const PRESSTV_PAGES = [
+  "https://www.presstv.ir",
+  "https://www.presstv.ir/Section/10101",   // Politics
+  "https://www.presstv.ir/Section/10102",   // Society
+  "https://www.presstv.ir/Section/10104",   // Middle East
+  "https://www.presstv.ir/Section/10105",   // World
+  "https://www.presstv.ir/Section/10106",   // Defense
+  "https://www.presstv.ir/Section/13006",   // Editor's Choice
+  "https://www.presstv.ir/Section/10101/2", // Politics p2
+  "https://www.presstv.ir/Section/10106/2", // Defense p2
+  "https://www.presstv.ir/Section/10104/2", // Middle East p2
+];
+
+function extractPressTVImages(html: string, map: Map<string, string>) {
+  // Forward: <a href=/Detail/...> ... <img src=//cdn.presstv.ir/...>
+  for (const m of html.matchAll(/<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]*?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi)) {
+    const path = m[1];
+    let imgUrl = m[2];
+    if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
+    imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
+    if (!map.has(path)) map.set(path, imgUrl);
+  }
+  // Reverse: <img src=//cdn.presstv.ir/...> ... <a href=/Detail/...>
+  for (const m of html.matchAll(/<img[^>]+src=["']?(\/\/cdn\.presstv\.ir\/Photo[^"'\s>]+)["']?[\s\S]*?<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?/gi)) {
+    const path = m[2];
+    let imgUrl = m[1];
+    if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
+    imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
+    if (!map.has(path)) map.set(path, imgUrl);
+  }
+}
+
 async function scrapePressTVImageMap(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
-  try {
-    const res = await fetch("https://www.presstv.ir", {
-      next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(10000),
-      headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
-    });
-    if (!res.ok) return map;
-    const html = await res.text();
-    // Note: Press TV homepage uses unquoted attributes, so quotes are optional ["']?
-    const anchors = html.matchAll(/<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]*?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi);
-    for (const m of anchors) {
-      const path = m[1];
-      let imgUrl = m[2];
-      if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
-      imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
-      if (!map.has(path)) map.set(path, imgUrl);
+  // Scrape homepage + section pages in parallel for broad image coverage
+  const results = await Promise.allSettled(
+    PRESSTV_PAGES.map((url) =>
+      fetch(url, {
+        next: { revalidate: 3600 },
+        signal: AbortSignal.timeout(10000),
+        headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
+      }).then((r) => (r.ok ? r.text() : ""))
+    )
+  );
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value) {
+      extractPressTVImages(r.value, map);
     }
-    // Also match reverse order: <img> before <a>
-    const reverse = html.matchAll(/<img[^>]+src=["']?(\/\/cdn\.presstv\.ir\/Photo[^"'\s>]+)["']?[\s\S]*?<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?/gi);
-    for (const m of reverse) {
-      const path = m[2];
-      let imgUrl = m[1];
-      if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
-      imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
-      if (!map.has(path)) map.set(path, imgUrl);
-    }
-  } catch { /* non-fatal */ }
+  }
   return map;
 }
 

@@ -271,36 +271,50 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
   if (isCircuitOpen("presstv")) return [];
   const t0 = Date.now();
   try {
-    // Fetch homepage HTML for image extraction
-    const [homepageRes, rssArticles] = await Promise.allSettled([
-      fetch("https://www.presstv.ir", {
-        signal: AbortSignal.timeout(10000),
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-          Accept: "text/html",
-        },
-      }),
+    const PRESSTV_UA =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+    // Pages to scrape for images: homepage + key sections (page 1 + 2)
+    const scrapeUrls = [
+      "https://www.presstv.ir",
+      "https://www.presstv.ir/Section/10101",   // Politics
+      "https://www.presstv.ir/Section/10102",   // Society
+      "https://www.presstv.ir/Section/10104",   // Middle East
+      "https://www.presstv.ir/Section/10105",   // World
+      "https://www.presstv.ir/Section/10106",   // Defense
+      "https://www.presstv.ir/Section/13006",   // Editor's Choice
+      "https://www.presstv.ir/Section/10101/2", // Politics p2
+      "https://www.presstv.ir/Section/10106/2", // Defense p2
+      "https://www.presstv.ir/Section/10104/2", // Middle East p2
+    ];
+
+    // Fetch all listing pages + RSS in parallel
+    const [rssResult, ...pageResults] = await Promise.allSettled([
       fetchRSS(APIs.rssFeeds.pressTV, "presstv_rss", "Press TV"),
+      ...scrapeUrls.map((url) =>
+        fetch(url, {
+          signal: AbortSignal.timeout(10000),
+          headers: { "User-Agent": PRESSTV_UA, Accept: "text/html" },
+        }).then((r) => (r.ok ? r.text() : ""))
+      ),
     ]);
 
-    // Extract image map from homepage: article URL slug -> CDN image URL
+    // Extract image map from all listing pages
     const imageMap = new Map<string, string>();
-    if (homepageRes.status === "fulfilled" && homepageRes.value.ok) {
-      const html = await homepageRes.value.text();
-      // Press TV HTML uses unquoted attributes (href=/Detail/... src=//cdn...)
-      // Match anchor+image pairs: <a ... href=/Detail/...> ... <img src=//cdn.presstv.ir/...>
+    for (const result of pageResults) {
+      if (result.status !== "fulfilled" || !result.value) continue;
+      const html = result.value;
+
       const linkImgRegex =
         /<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]*?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi;
       let match: RegExpExecArray | null;
       while ((match = linkImgRegex.exec(html)) !== null) {
         const articlePath = match[1].replace(/^https?:\/\/[^/]+/, "");
-        const imgUrl = `https:${match[2]}`;
-        imageMap.set(articlePath, imgUrl);
+        if (!imageMap.has(articlePath)) {
+          imageMap.set(articlePath, `https:${match[2]}`);
+        }
       }
 
-      // Second pass: also find CDN images that appear before their <a> tag
-      // (some layout blocks put <img> then <a> for the same article)
       const imgLinkRegex =
         /<img[^>]+src=["']?(\/\/cdn\.presstv\.ir\/Photo[^"'\s>]+)["']?[\s\S]*?<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?/gi;
       while ((match = imgLinkRegex.exec(html)) !== null) {
@@ -309,28 +323,13 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
           imageMap.set(articlePath, `https:${match[1]}`);
         }
       }
-
-      // Also extract standalone articles from homepage as direct items
-      // Press TV uses unquoted classes: class=topnews-title, class=news-title, etc.
-      const titleRegex =
-        /<div[^>]+class=["']?(?:topnews-title|news-title|normal-news-title)["']?[^>]*>([\s\S]*?)<\/div>/gi;
-      let artMatch: RegExpExecArray | null;
-      while ((artMatch = titleRegex.exec(html)) !== null) {
-        const title = artMatch[1]
-          .replace(/<[^>]*>/g, "")
-          .replace(/&nbsp;/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-        if (!title || title.length < 10) continue;
-        // Title extracted but already covered by imageMap linkage above
-      }
     }
 
     // Get RSS articles (has titles/descriptions but no images)
     const rssItems =
-      rssArticles.status === "fulfilled" ? rssArticles.value : [];
+      rssResult.status === "fulfilled" ? rssResult.value : [];
 
-    // Merge: attach homepage images to RSS articles by matching URL paths
+    // Merge: attach listing-page images to RSS articles by matching URL paths
     const articles: RawArticle[] = rssItems.map((article) => {
       const urlPath = new URL(article.url).pathname;
       const cdnImage = imageMap.get(urlPath);
@@ -341,8 +340,8 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
       };
     });
 
-    // Add homepage-only articles not in RSS (e.g. featured/top stories)
-    if (homepageRes.status === "fulfilled" && homepageRes.value.ok) {
+    // Add listing-page-only articles not in RSS (e.g. featured/top stories)
+    if (imageMap.size > 0) {
       const rssUrls = new Set(articles.map((a) => new URL(a.url).pathname));
       for (const [path, imgUrl] of imageMap) {
         if (path.startsWith("_added_") || !path.startsWith("/Detail/")) continue;
