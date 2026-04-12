@@ -625,14 +625,55 @@ async function fetchTehranTimesStories(): Promise<StoryData[]> {
 }
 
 // ── Press TV (Iranian English news) ─────────────────────────────────────────
+/**
+ * Scrape Press TV homepage to build a map of article paths to CDN image URLs.
+ * Press TV RSS contains zero image data, but the homepage pairs articles with
+ * images from cdn.presstv.ir.
+ */
+async function scrapePressTVImageMap(): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const res = await fetch("https://www.presstv.ir", {
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(10000),
+      headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
+    });
+    if (!res.ok) return map;
+    const html = await res.text();
+    // Note: Press TV homepage uses unquoted attributes, so quotes are optional ["']?
+    const anchors = html.matchAll(/<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?[^>]*>[\s\S]*?<img[^>]+src=["']?(\/\/cdn\.presstv\.ir[^"'\s>]+)["']?/gi);
+    for (const m of anchors) {
+      const path = m[1];
+      let imgUrl = m[2];
+      if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
+      imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
+      if (!map.has(path)) map.set(path, imgUrl);
+    }
+    // Also match reverse order: <img> before <a>
+    const reverse = html.matchAll(/<img[^>]+src=["']?(\/\/cdn\.presstv\.ir\/Photo[^"'\s>]+)["']?[\s\S]*?<a[^>]+href=["']?([^"'\s>]*\/Detail\/[^"'\s>]+)["']?/gi);
+    for (const m of reverse) {
+      const path = m[2];
+      let imgUrl = m[1];
+      if (imgUrl.startsWith("//")) imgUrl = "https:" + imgUrl;
+      imgUrl = imgUrl.replace(/\.s\.jpg$/, ".m.jpg");
+      if (!map.has(path)) map.set(path, imgUrl);
+    }
+  } catch { /* non-fatal */ }
+  return map;
+}
+
 async function fetchPressTVStories(): Promise<StoryData[]> {
   try {
-    const res = await fetch("https://www.presstv.ir/rss.xml", {
-      next: { revalidate: 21600 },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return [];
-    const xml = await res.text();
+    // Fetch RSS and homepage images in parallel
+    const [rssRes, imageMap] = await Promise.all([
+      fetch("https://www.presstv.ir/rss.xml", {
+        next: { revalidate: 21600 },
+        signal: AbortSignal.timeout(8000),
+      }),
+      scrapePressTVImageMap(),
+    ]);
+    if (!rssRes.ok) return [];
+    const xml = await rssRes.text();
 
     const stories: StoryData[] = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/g;
@@ -649,12 +690,18 @@ async function fetchPressTVStories(): Promise<StoryData[]> {
 
       const bodyText = decodeXmlEntities((desc || "").replace(/<[^>]*>/g, ""));
 
-      // Extract image from description HTML if no enclosure
       const descImg = !enclosure
         ? desc?.match(/<img[^>]+src="([^"]+)"/)?.[1]
         : undefined;
 
-      const rawImg = enclosure || descImg;
+      // Try RSS image first, then homepage image map
+      let imageUrl = enclosure || descImg;
+      if (!imageUrl && link) {
+        try {
+          const path = new URL(link, "https://www.presstv.ir").pathname;
+          imageUrl = imageMap.get(path);
+        } catch { /* ignore malformed URLs */ }
+      }
 
       stories.push({
         id: `ptv-${link.match(/\/(\d{5,})\//)?.[1] || link.split("/").filter(Boolean).pop() || Math.random().toString(36).slice(2)}`,
@@ -664,7 +711,7 @@ async function fetchPressTVStories(): Promise<StoryData[]> {
         publishedAt: new Date().toISOString(),
         excerpt: bodyText.slice(0, 300) + (bodyText.length > 300 ? "..." : ""),
         body: bodyText.slice(0, 1500),
-        imageUrl: rawImg,
+        imageUrl,
         theme: "Iran",
       });
     }
