@@ -241,6 +241,21 @@ export async function getStories(): Promise<StoryData[]> {
   try {
     const dbStories = await getStoriesFromDB();
     if (dbStories && dbStories.length > 0) {
+      // If many Press TV stories lack images, enrich from section pages
+      const ptv = dbStories.filter((s) => s.source === "Press TV");
+      const missingPtv = ptv.filter((s) => !s.imageUrl);
+      if (missingPtv.length > 0 && missingPtv.length >= ptv.length / 2) {
+        try {
+          const imageMap = await scrapePressTVImageMap();
+          for (const story of missingPtv) {
+            try {
+              const path = new URL(story.url, "https://www.presstv.ir").pathname;
+              const img = imageMap.get(path);
+              if (img) story.imageUrl = img;
+            } catch { /* ignore malformed URLs */ }
+          }
+        } catch { /* scraping failed, serve what we have */ }
+      }
       return dbStories;
     }
   } catch {
