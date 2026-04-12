@@ -287,6 +287,7 @@ export async function fetchPressTV(): Promise<RawArticle[]> {
       "https://www.presstv.ir/Section/10106/2", // Defense p2
       "https://www.presstv.ir/Section/10104/2", // Middle East p2
       "https://www.presstv.ir/Section/13006/2", // Editor's Choice p2
+      "https://www.presstv.ir/Section/13006/3", // Editor's Choice p3
       "https://www.presstv.ir/Section/10106/3", // Defense p3
     ];
 
